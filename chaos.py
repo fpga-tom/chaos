@@ -98,7 +98,7 @@ def fitness(guess):
     return result
 
 
-sp = np.random.rand(10)-.5#[-1.,  1., -1, -.1,  1.,  1.,  1., -1.]
+sp = np.random.rand(10)-.5
 sp = [0.44219481, -0.36352587, -0.1619554 ,  0.34725717, -0.14898118, -0.86185026, -0.40825187, -0.60434407, -0.38570763, -0.73558969 ]
 print(fitness(sp))
 #result = minimize(fitness, sp, method='Powell',options={'maxiter': 20000})
