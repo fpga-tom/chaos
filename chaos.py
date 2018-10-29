@@ -3,6 +3,7 @@ from scipy.io.wavfile import write
 from scipy import signal
 from scipy.optimize import minimize
 import binascii
+#import nolds
 
 
 def hd(a,b):
@@ -21,6 +22,7 @@ def fitness(guess):
     def gen_a(LEs, f):
         len_LEs=len(LEs)
         q = f*np.eye(len_LEs) + np.ones([len_LEs, len_LEs])
+        print(np.linalg.det(q))
         qi = np.linalg.inv(q)
         la = np.eye(len_LEs) * np.exp(LEs)
         A=np.matmul(np.matmul(q,la),qi)
@@ -34,14 +36,15 @@ def fitness(guess):
     x3 = np.random.rand(len(LEs))
 
 
-    fs = 32000*6
+    fs = 32000
     seconds = 4
+    bps=32
     time = range(0,fs*seconds)
     da = []
     bit_tx = []
     bit_rx = []
-    oversample=fs/32
-    for t in range(0, 32*seconds):
+    oversample=fs/bps
+    for t in range(0, bps*seconds):
         r = 0 if message_bin[t] == '0' else 1
         bit_tx.append(r)
         for i in range(0,oversample):
@@ -54,44 +57,51 @@ def fitness(guess):
     x_prev = 0
     x_prev1 = 0
     filt = [1./256 for i in range(0, 256)]
+    m_filt = [1. for i  in range(0, oversample)]
     filt_data = []
     N=1024
     with open('x.txt', 'w') as f:
         with open('x3.txt', 'w') as f3:
             with open('d.txt', 'w') as f4:
-                for i in time:
-                    if da[i] == 1:
-                        x1 = np.matmul(A, x1) % 1
-                        x_out = x1
-                    else:
-                        x0 = np.matmul(B, x0) % 1
-                        x_out = x0
-                    idx = 0
-                    x_in = x_out[idx]
-                    x_in += np.random.normal(0,1,1)
-                    data.append(x_in)
-                    x3[idx] = x_in
-                    x3 = np.matmul(A, x3) % 1
-                    f.write("%d %f\n" % (i, x_out[idx]))
-                    f3.write("%d %f\n" % (i+1, x3[idx]))
-                    filt_data.append(abs(-x_prev + x_in))
-                    x_prev = x3[idx]
-                fd = signal.lfilter(filt, [1.], filt_data,0)
-                m = sum(fd)/len(fd)
-                print('mean: %f' % m)
-                for b in range(0,len(fd),oversample):
-                    v = sum(fd[b:b+oversample])/oversample
-                    bit = 1 if v < m else 0
-                    bit_rx.append(bit)
+                with open('m.txt', 'w') as f5:
+                    for i in time:
+                        if da[i] == 1:
+                            x1 = np.matmul(A, x1) % 1
+                            x_out = x1
+                        else:
+                            x0 = np.matmul(B, x0) % 1
+                            x_out = x0
+                        idx = 0
+                        x_in = x_out[idx]
+#                        x_in += np.random.normal(0,1,1)
+                        data.append(x_in)
+                        x3[idx] = x_in
+                        x3 = np.matmul(A, x3) % 1
+                        f.write("%d %f\n" % (i, x_out[idx]))
+                        f3.write("%d %f\n" % (i+1, x3[idx]))
+                        filt_data.append(abs(-x_prev + x_in))
+                        x_prev = x3[idx]
+                    fd = signal.lfilter(filt, [1.], filt_data,0)
+                    fd_matched = signal.lfilter(m_filt, [1.], filt_data,0)
+                    m = (max(fd) + min(fd))/2.
+                    print('mean: %f' % m)
+                    for b in range(0,len(fd),oversample):
+#                        v = fd[b+oversample/2]
+                        v = sum(fd[b:b+oversample])/oversample
+                        bit = 1 if v < m else 0
+                        bit_rx.append(bit)
 
 
-                rx_string = "".join(chr(int("".join(map(str,bit_rx[i:i+8])),2)) for i in range(0,len(bit_rx),8))
-                print(rx_string)
-                for i,fd_filt in enumerate(fd):
-                    f4.write("%d %f\n" % (i, fd_filt))
+                    rx_string = "".join(chr(int("".join(map(str,bit_rx[i:i+8])),2)) for i in range(0,len(bit_rx),8))
+                    print(rx_string)
+                    for i,fd_filt in enumerate(fd):
+                        f4.write("%d %f\n" % (i, fd_filt))
+                    for i,fd_filt in enumerate(fd_matched):
+                        f5.write("%d %f\n" % (i, fd_filt/6000))
 
     scaled = np.int16(data/np.max(np.abs(data)) * 32767)
     write('test.wav', 32000, scaled)
+#    print(nolds.lyap_e(np.ndarray.flatten(np.array(data))))
     
     result = hd(bit_rx, bit_tx)
     print(result)
@@ -100,6 +110,8 @@ def fitness(guess):
 
 sp = np.random.rand(10)-.5
 sp = [0.44219481, -0.36352587, -0.1619554 ,  0.34725717, -0.14898118, -0.86185026, -0.40825187, -0.60434407, -0.38570763, -0.73558969 ]
+sp = [ 0.017, -.3, -.2, .11, -.7, -.5]
+#sp = [5.66702738 , 1.03231094 , 7.40692155 , 5.64367297 , 4.51208461, -3.63545297, -1.30784372, -1.16537576, -0.20377135, -0.44195027]
 print(fitness(sp))
 #result = minimize(fitness, sp, method='Powell',options={'maxiter': 20000})
 #print(result.x)
